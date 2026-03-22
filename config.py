@@ -97,6 +97,20 @@ SUPPLEMENTAL_PAIRS: list[tuple[str, str]] = [
 # --------------------------------------------------------------------------- #
 SIX_CONTINENT_RECORD_SECONDS = 56 * 3600 + 56 * 60   # 204,960 s
 
+# --------------------------------------------------------------------------- #
+# Antipodal circumnavigation world record
+# Current record: Andrew Fisher, 52h 34m 00s (Jan 2018)
+# Route: PVG → AKL → EZE → AMS → PVG
+# Antipodal pair: PVG (31.1°N 121.8°E) ↔ EZE (34.8°S 58.5°W), offset ≈ 4.0°
+# Guinness rules:
+#   - Visit two airports forming a near-antipodal pair (lat_off + lon_off ≤ 5°)
+#   - Must land AND change planes at each antipodal airport
+#   - Must cross the equator
+#   - Must return to origin on scheduled commercial flights
+# --------------------------------------------------------------------------- #
+ANTIPODAL_RECORD_SECONDS = 52 * 3600 + 34 * 60       # 189,240 s
+ANTIPODAL_TOLERANCE_DEG  = 5.0                        # combined lat+lon offset
+
 # ISO-3166-1 alpha-2 country code → continent code
 # AF=Africa, AS=Asia, EU=Europe, NA=North America, OC=Oceania, SA=South America
 COUNTRY_TO_CONTINENT: dict[str, str] = {
@@ -362,6 +376,115 @@ SIX_CONTINENT_PAIRS: list[tuple[str, str]] = [
     # ── South America ↔ Asia (rare but worth checking) ────────────────────────
     ("GRU", "DXB"), ("DXB", "GRU"),
     ("GRU", "DOH"), ("DOH", "GRU"),
+]
+
+# --------------------------------------------------------------------------- #
+# Antipodal circumnavigation route pairs.
+# Extends SIX_CONTINENT_PAIRS with legs specific to the antipodal record.
+# Key corridors:
+#   Asia ↔ New Zealand  (PVG/HKG/ICN/NRT/BKK/KUL/SIN → AKL/CHC)
+#   Oceania ↔ South America  (AKL/SYD → EZE/GRU/SCL)
+#   Europe → Shanghai/PVG  (LHR/CDG/AMS/FRA → PVG)
+#   Asia ↔ South America via West Coast  (NRT/ICN/HKG/SIN → LAX/MIA → EZE/LIM/BOG/GRU)
+#   Buenos Aires ↔ Asia via Europe  (EZE → AMS/LHR → HKG/SIN/PVG)
+# --------------------------------------------------------------------------- #
+ANTIPODAL_ROUTE_PAIRS: list[tuple[str, str]] = [
+    # ── Asia ↔ Auckland (NZ) ─────────────────────────────────────────────────
+    ("PVG", "AKL"), ("AKL", "PVG"),
+    ("SHA", "AKL"), ("AKL", "SHA"),
+    ("HKG", "AKL"), ("AKL", "HKG"),
+    ("ICN", "AKL"), ("AKL", "ICN"),
+    ("NRT", "AKL"), ("AKL", "NRT"),
+    ("BKK", "AKL"), ("AKL", "BKK"),
+    ("KUL", "AKL"), ("AKL", "KUL"),
+    ("SIN", "AKL"), ("AKL", "SIN"),
+    ("PEK", "AKL"), ("AKL", "PEK"),
+    ("CGK", "AKL"), ("AKL", "CGK"),
+
+    # ── Auckland (NZ) ↔ South America ────────────────────────────────────────
+    ("AKL", "EZE"), ("EZE", "AKL"),
+    ("AKL", "GRU"), ("GRU", "AKL"),
+    ("SYD", "EZE"), ("EZE", "SYD"),
+    ("MEL", "EZE"), ("EZE", "MEL"),
+
+    # ── Europe ↔ Shanghai / Beijing (closing the Fisher-style loop) ───────────
+    ("LHR", "PVG"), ("PVG", "LHR"),
+    ("CDG", "PVG"), ("PVG", "CDG"),
+    ("AMS", "PVG"), ("PVG", "AMS"),
+    ("FRA", "PVG"), ("PVG", "FRA"),
+    ("MAD", "PVG"), ("PVG", "MAD"),
+    ("IST", "PVG"), ("PVG", "IST"),
+    ("LHR", "SHA"), ("SHA", "LHR"),
+    ("CDG", "SHA"), ("SHA", "CDG"),
+    ("AMS", "SHA"), ("SHA", "AMS"),
+    ("FRA", "SHA"), ("SHA", "FRA"),
+    ("LHR", "PEK"), ("PEK", "LHR"),
+    ("CDG", "PEK"), ("PEK", "CDG"),
+    ("AMS", "PEK"), ("PEK", "AMS"),
+    ("FRA", "PEK"), ("PEK", "FRA"),
+
+    # ── Europe ↔ Hong Kong / Singapore (alternative Asian legs) ───────────────
+    # (many already in SIX_CONTINENT_PAIRS via DXB/DOH; add direct EU↔SIN/HKG)
+    ("LHR", "SIN"), ("SIN", "LHR"),
+    ("LHR", "HKG"), ("HKG", "LHR"),
+    ("CDG", "SIN"), ("SIN", "CDG"),
+    ("CDG", "HKG"), ("HKG", "CDG"),
+    ("AMS", "SIN"), ("SIN", "AMS"),
+    ("AMS", "HKG"), ("HKG", "AMS"),
+    ("FRA", "SIN"), ("SIN", "FRA"),
+    ("FRA", "HKG"), ("HKG", "FRA"),
+    ("FRA", "BKK"), ("BKK", "FRA"),
+    ("FRA", "NRT"), ("NRT", "FRA"),
+    ("FRA", "ICN"), ("ICN", "FRA"),
+    ("AMS", "NRT"), ("NRT", "AMS"),
+    ("AMS", "ICN"), ("ICN", "AMS"),
+    ("AMS", "BKK"), ("BKK", "AMS"),
+
+    # ── EZE ↔ Asian hubs (via Europe or direct) ───────────────────────────────
+    ("EZE", "LHR"), ("LHR", "EZE"),
+    ("EZE", "SIN"), ("SIN", "EZE"),
+    ("EZE", "HKG"), ("HKG", "EZE"),
+
+    # ── Asia ↔ South America via US West Coast ────────────────────────────────
+    ("NRT", "LAX"), ("LAX", "NRT"),
+    ("NRT", "SFO"), ("SFO", "NRT"),
+    ("ICN", "LAX"), ("LAX", "ICN"),
+    ("ICN", "SFO"), ("SFO", "ICN"),
+    ("HKG", "LAX"), ("LAX", "HKG"),
+    ("SIN", "LAX"), ("LAX", "SIN"),
+    ("BKK", "LAX"), ("LAX", "BKK"),
+    ("LAX", "EZE"), ("EZE", "LAX"),
+    ("LAX", "LIM"), ("LIM", "LAX"),
+    ("LAX", "BOG"), ("BOG", "LAX"),
+    ("LAX", "GRU"), ("GRU", "LAX"),
+    ("LAX", "SCL"), ("SCL", "LAX"),
+    ("SFO", "EZE"), ("EZE", "SFO"),
+    ("SFO", "LIM"), ("LIM", "SFO"),
+    ("SFO", "GRU"), ("GRU", "SFO"),
+
+    # ── South American hubs ↔ North America (bridge) ──────────────────────────
+    ("EZE", "MIA"), ("MIA", "EZE"),
+    ("LIM", "LAX"), ("LAX", "LIM"),
+    ("LIM", "MIA"), ("MIA", "LIM"),
+    ("LIM", "JFK"), ("JFK", "LIM"),
+    ("BOG", "LAX"), ("LAX", "BOG"),
+    ("GRU", "LAX"), ("LAX", "GRU"),
+
+    # ── Asia ↔ South America via MIA/JFK ─────────────────────────────────────
+    ("NRT", "JFK"), ("JFK", "NRT"),
+    ("ICN", "JFK"), ("JFK", "ICN"),
+    ("HKG", "JFK"), ("JFK", "HKG"),
+    ("SIN", "JFK"), ("JFK", "SIN"),
+    ("JFK", "EZE"), ("EZE", "JFK"),
+    ("JFK", "GRU"), ("GRU", "JFK"),
+    ("JFK", "BOG"), ("BOG", "JFK"),
+    ("MIA", "BOG"), ("BOG", "MIA"),
+    ("MIA", "LIM"), ("LIM", "MIA"),
+
+    # ── Christchurch (NZ) – sometimes used for Oceania legs ──────────────────
+    ("CHC", "EZE"), ("EZE", "CHC"),
+    ("SIN", "CHC"), ("CHC", "SIN"),
+    ("HKG", "CHC"), ("CHC", "HKG"),
 ]
 
 # --------------------------------------------------------------------------- #

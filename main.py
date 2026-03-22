@@ -44,6 +44,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from config import (
     GUINNESS_MIN_DISTANCE_KM, MIN_ROUTE_DISTANCE_KM,
     SUPPLEMENTAL_PAIRS, SIX_CONTINENT_PAIRS,
+    ANTIPODAL_ROUTE_PAIRS, ANTIPODAL_TOLERANCE_DEG,
 )
 
 
@@ -81,6 +82,16 @@ def parse_args() -> argparse.Namespace:
                    help="Max legs for six-continent search (default 7).")
     p.add_argument("--budget-hours-6c", type=float, default=80.0,
                    help="Prune budget for six-continent search (default 80h).")
+    p.add_argument("--antipodal", action="store_true", default=False,
+                   help="Search for fastest antipodal circumnavigation "
+                        "(record: 52h 34m, PVG→AKL→EZE→AMS→PVG, Andrew Fisher).")
+    p.add_argument("--max-legs-ap", type=int, default=6,
+                   help="Max legs for antipodal search (default 6).")
+    p.add_argument("--budget-hours-ap", type=float, default=75.0,
+                   help="Prune budget for antipodal search (default 75h).")
+    p.add_argument("--antipodal-tolerance", type=float, default=ANTIPODAL_TOLERANCE_DEG,
+                   help=f"Combined lat+lon tolerance for near-antipodal pairs "
+                        f"(default {ANTIPODAL_TOLERANCE_DEG}°).")
     return p.parse_args()
 
 
@@ -275,6 +286,131 @@ def run_six_continents(args) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Antipodal circumnavigation search
+# --------------------------------------------------------------------------- #
+
+def run_antipodal(args) -> None:
+    from circumnavigator.data.loader import load_airports, load_routes
+    from circumnavigator.data.routes import build_graph
+    from circumnavigator.geometry.antipodal import build_antipodal_partners, antipodal_components
+    from circumnavigator.phase2.airlabs_client import prefetch_all_pairs
+    from circumnavigator.phase3.reporter import print_antipodal_report
+    from circumnavigator.search.antipodal import search
+
+    print("Loading airport data...", file=sys.stderr)
+    airports = load_airports()
+    raw_routes = load_routes(airports)
+
+    min_dist = args.min_route_distance or MIN_ROUTE_DISTANCE_KM
+    graph = build_graph(airports, raw_routes, min_distance_km=min_dist)
+    print(f"Graph: {len(graph)} airports, "
+          f"{sum(len(v) for v in graph.values())} edges", file=sys.stderr)
+
+    # Compute near-antipodal pairs from all airports in the long-haul graph.
+    graph_iatas = set(graph.keys())
+    print(f"Computing near-antipodal pairs "
+          f"(tolerance {args.antipodal_tolerance}°, independent per dimension) ...",
+          file=sys.stderr)
+    antipodal_partners = build_antipodal_partners(
+        airports, graph_iatas, tolerance=args.antipodal_tolerance
+    )
+    all_ap_airports = set(antipodal_partners.keys())
+    total_pairs = sum(len(v) for v in antipodal_partners.values()) // 2
+    print(f"  Found {total_pairs} near-antipodal pairs "
+          f"across {len(all_ap_airports)} airports.", file=sys.stderr)
+
+    # Report valid pairs for transparency.
+    pair_list = []
+    seen_pp: set[frozenset] = set()
+    for iata_a, partners_set in antipodal_partners.items():
+        for iata_b in partners_set:
+            key = frozenset({iata_a, iata_b})
+            if key not in seen_pp:
+                seen_pp.add(key)
+                ap_a, ap_b = airports.get(iata_a), airports.get(iata_b)
+                if ap_a and ap_b:
+                    lat_off, lon_off = antipodal_components(
+                        ap_a.lat, ap_a.lon, ap_b.lat, ap_b.lon
+                    )
+                    pair_list.append((lat_off + lon_off, iata_a, iata_b, lat_off, lon_off))
+    pair_list.sort()
+    print(f"  All near-antipodal pairs (lat_off ≤ {args.antipodal_tolerance}°,"
+          f" lon_off ≤ {args.antipodal_tolerance}°):", file=sys.stderr)
+    for _, a, b, lat_off, lon_off in pair_list:
+        ap_a, ap_b = airports[a], airports[b]
+        print(f"    {a} ({ap_a.city}) ↔ {b} ({ap_b.city})"
+              f"  lat_off={lat_off:.2f}°  lon_off={lon_off:.2f}°", file=sys.stderr)
+
+    # Collect route pairs to fetch from AirLabs.
+    # SUPPLEMENTAL_PAIRS + ANTIPODAL_ROUTE_PAIRS + SIX_CONTINENT_PAIRS
+    # + all long-haul graph edges touching an antipodal airport.
+    seen_fetch: set[tuple[str, str]] = set()
+    fetch_pairs: list[tuple[str, str]] = []
+
+    def _add(d: str, a: str) -> None:
+        if (d, a) not in seen_fetch:
+            seen_fetch.add((d, a))
+            fetch_pairs.append((d, a))
+
+    for d, a in SUPPLEMENTAL_PAIRS:
+        _add(d, a)
+    for d, a in ANTIPODAL_ROUTE_PAIRS:
+        _add(d, a)
+    for d, a in SIX_CONTINENT_PAIRS:
+        _add(d, a)
+
+    # Include all long-haul graph edges touching any antipodal airport.
+    for dep in all_ap_airports:
+        for arr, _ in graph.get(dep, []):
+            _add(dep, arr)
+            _add(arr, dep)
+
+    print(f"\nFetching schedule data for {len(fetch_pairs)} route pairs ...",
+          file=sys.stderr)
+    freq_map = prefetch_all_pairs(fetch_pairs, verbose=True)
+
+    # Origins: every airport in the freq_map that has outbound flights.
+    if args.start:
+        origins = [args.start]
+    else:
+        origins = sorted({dep for dep, arr in freq_map.keys() if freq_map[(dep, arr)]})
+
+    base = date.fromisoformat(args.start_date)
+    start_dates = [base + timedelta(days=i) for i in range(args.search_days)]
+
+    directions = (
+        ["eastbound", "westbound"] if args.direction == "both" else [args.direction]
+    )
+
+    all_schedules = []
+    for direction in directions:
+        print(
+            f"\nAntipodal search: {direction}, {len(origins)} origins, "
+            f"{len(start_dates)} dates, max {args.max_legs_ap} legs, "
+            f"budget {args.budget_hours_ap:.0f}h ...",
+            file=sys.stderr,
+        )
+        schedules = search(
+            origins=origins,
+            freq_map=freq_map,
+            airports=airports,
+            start_dates=start_dates,
+            antipodal_partners=antipodal_partners,
+            max_legs=args.max_legs_ap,
+            direction=direction,
+            require_min_distance=not args.skip_min_distance,
+            budget_hours=args.budget_hours_ap,
+            max_wait_hours=args.max_wait_hours,
+            top_n=args.top * 2,
+            verbose=True,
+        )
+        all_schedules.extend(schedules)
+
+    all_schedules.sort(key=lambda s: s.total_elapsed_seconds)
+    print_antipodal_report(all_schedules, antipodal_partners, top_n=args.top)
+
+
+# --------------------------------------------------------------------------- #
 # Geometry-only mode (Phase 1 preview, no API)
 # --------------------------------------------------------------------------- #
 
@@ -291,7 +427,9 @@ def run_geometry_only(args) -> None:
 
 def main() -> None:
     args = parse_args()
-    if args.six_continents:
+    if args.antipodal:
+        run_antipodal(args)
+    elif args.six_continents:
         run_six_continents(args)
     elif args.geometry_only:
         run_geometry_only(args)

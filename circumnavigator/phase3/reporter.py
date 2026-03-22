@@ -6,7 +6,10 @@ import json
 import os
 import sys
 
-from config import RECORD_TIME_SECONDS, SIX_CONTINENT_RECORD_SECONDS, RESULTS_FILE, OUTPUT_DIR
+from config import (
+    RECORD_TIME_SECONDS, SIX_CONTINENT_RECORD_SECONDS,
+    ANTIPODAL_RECORD_SECONDS, RESULTS_FILE, OUTPUT_DIR,
+)
 from circumnavigator.phase1.enumerator import CandidateRoute
 from circumnavigator.phase2.static_scheduler import ScheduledRoute
 
@@ -155,6 +158,75 @@ def print_six_continent_report(
         print(f"       Start:    {s.start_date}  "
               f"({s.legs[0].departure_utc.strftime('%a')})")
         print(f"       Distance: {s.candidate.total_km:,.0f} km")
+        print()
+        for leg in s.legs:
+            conn_str = ""
+            if leg.connection_minutes is not None:
+                conn_str = f"  (connection: {leg.connection_minutes}m)"
+            print(
+                f"       {(leg.flight_number or '?'):>7}  "
+                f"{leg.origin} → {leg.destination}  "
+                f"dep {leg.departure_utc.strftime('%Y-%m-%d %H:%MZ')}  "
+                f"arr {leg.arrival_utc.strftime('%Y-%m-%d %H:%MZ')}  "
+                f"[{leg.duration_minutes}m]{conn_str}"
+            )
+    print()
+
+
+# --------------------------------------------------------------------------- #
+# Antipodal circumnavigation report
+# --------------------------------------------------------------------------- #
+
+def print_antipodal_report(
+    schedules: list[ScheduledRoute],
+    antipodal_partners: dict,   # iata -> frozenset[iata]
+    airports_dict: dict | None = None,
+    top_n: int = 20,
+) -> None:
+    record_s = ANTIPODAL_RECORD_SECONDS
+    record_h = record_s / 3600
+    print(f"\n{'='*80}")
+    print(f"  ANTIPODAL CIRCUMNAVIGATION  (top {top_n} of {len(schedules)} valid)")
+    print(f"  Record to beat: {record_h:.4f}h  (52h 34m 00s)")
+    print(f"  Holder: Andrew Fisher  —  PVG → AKL → EZE → AMS → PVG")
+    print(f"  Rules: land+change-planes at a near-antipodal pair; cross equator")
+    print(f"{'='*80}\n")
+
+    if not schedules:
+        print("  No valid schedules found.\n")
+        return
+
+    for i, s in enumerate(schedules[:top_n], 1):
+        diff = int(record_s - s.total_elapsed_seconds)
+        sign = "-" if diff >= 0 else "+"
+        abs_diff = abs(diff)
+        dh, dr = divmod(abs_diff, 3600)
+        dm, ds = divmod(dr, 60)
+        label = "faster" if sign == "-" else "slower"
+        vs_str = f"({sign}{dh}h {dm:02d}m {ds:02d}s {label})"
+        beats = diff >= 0
+        flag = "  *** BEATS RECORD ***" if beats else ""
+
+        route_str = " → ".join(s.candidate.airports)
+        print(f"\n  [{i}] {route_str}{flag}")
+        print(f"       Elapsed:  {s.elapsed_hms}  {vs_str}")
+        print(f"       Start:    {s.start_date}  "
+              f"({s.legs[0].departure_utc.strftime('%a')})")
+        print(f"       Distance: {s.candidate.total_km:,.0f} km")
+
+        # Identify the antipodal pair in this route
+        visited = [leg.origin for leg in s.legs] + [s.legs[-1].destination]
+        found_pair = None
+        for j, a in enumerate(visited):
+            for b in visited[j + 1:]:
+                if b in antipodal_partners.get(a, frozenset()):
+                    found_pair = (a, b)
+                    break
+            if found_pair:
+                break
+        if found_pair:
+            print(f"       Antipodal pair: {found_pair[0]} ↔ {found_pair[1]}")
+
         print()
         for leg in s.legs:
             conn_str = ""
