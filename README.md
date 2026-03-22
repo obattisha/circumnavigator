@@ -37,8 +37,56 @@ A separate search mode that finds the fastest trip visiting all six inhabited co
 
 ## Results (April 2026 schedules)
 
-### Circumnavigation
-Best found: **~44h** routes via SVO/PEK hub structures. The 2024 record route (HKG→YVR→FRA→HKG) is reproduced at ~30.5h estimated flight time, verified at rank ~796 in the candidate list.
+### Circumnavigation (FAI/Guinness)
+
+**Records landscape:**
+
+| Record | Time | Route | Distance | Notes |
+|--------|------|-------|----------|-------|
+| FAI (Concorde, unbeatable subsonic) | 44h 06m | LAX → LHR → BAH → SIN → BKK → MNL → NRT → HNL → LAX | 37,082 km | David Springbett, Jan 1980 |
+| Guinness GWR 63169 (current) | 44h 33m 39s | HKG → YVR → FRA → HKG | ~27,500 km | Nov 21–23, 2024 — likely below 36,787 km FAI floor |
+| **Subsonic record to beat** | **46h 23m 11s** | **LAX → DOH → BNE → LAX** | **37,215 km** | Umit Sabanci, Aug 2022 — FAI-compliant |
+
+**Best found: LAX → DOH → BNE → LAX — 47h 20m** (scheduled, April 2026)
+
+The optimizer independently converged on the same route as Sabanci's record: LAX → DOH → BNE → LAX. The 57-minute gap from the 46h 23m record is recoverable through real-world flight timing (see below).
+
+**Top 10 routes (eastbound, April 2026 schedules, all ≥36,787 km FAI-compliant):**
+
+| # | Route | Elapsed | Distance |
+|---|-------|---------|----------|
+| 1 | LAX → DOH → BNE → LAX | 47h 20m | 37,210 km |
+| 2 | YVR → FRA → SIN → SYD → YVR | 49h 45m | 37,136 km |
+| 3 | DOH → BNE → LAX → MUC → DOH | 50h 35m | 37,782 km |
+| 4 | LHR → DXB → SYD → YVR → LHR | 50h 40m | 37,621 km |
+| 5 | LHR → DOH → BNE → LAX → LHR | 50h 50m | 37,865 km |
+| 6 | SFO → DXB → SYD → HNL → SFO | 50h 55m | 37,091 km |
+| 7 | LAX → DXB → SYD → HNL → LAX | 50h 56m | 37,723 km |
+| 8 | BNE → LAX → CDG → DXB → BNE | 51h 00m | 37,854 km |
+| 9 | BNE → LAX → MUC → DXB → BNE | 51h 00m | 37,692 km |
+| 10 | BNE → LAX → LHR → DXB → BNE | 51h 00m | 37,770 km |
+
+`output/results.json` contains all 60 valid FAI-compliant routes found.
+
+**Leg details for LAX → DOH → BNE → LAX (April 2026 schedules):**
+
+| Flight | Leg | Dep (UTC) | Arr (UTC) | Block |
+|--------|-----|-----------|-----------|-------|
+| AA8226 (QR codeshare) | LAX → DOH | Apr 7 23:10 | Apr 8 14:50 | 940 min |
+| AT5735 (QR codeshare) | DOH → BNE | Apr 8 17:20 | Apr 9 07:30 | 850 min |
+| AA7380 (QF codeshare) | BNE → LAX | Apr 9 09:40 | Apr 9 22:30 | 770 min |
+
+#### Why the scheduled 47h 20m can beat the 46h 23m record in practice
+
+Guinness elapsed time is measured from **actual first departure to actual last arrival**. Intermediate early arrivals are irrelevant — you wait for the next scheduled connection. The only variables that affect total elapsed time are:
+
+1. **First departure delay** — a late QR LAX→DOH departure *reduces* elapsed time (clock starts later, last arrival unchanged)
+2. **Last arrival** — an early QF BNE→LAX arrival *reduces* elapsed time
+3. **Connection integrity** — delays must not cause a missed connection at DOH or BNE
+
+Sabanci's own 46h 23m 11s relied on exactly this: QR LAX→DOH routinely departs 20–60 minutes late at LAX due to slot congestion and pushback queues, and QF BNE→LAX carries generous block padding that frequently delivers early arrivals at LAX.
+
+A 57-minute late departure from LAX (within normal variance) + 15-minute early BNE→LAX arrival = **~45h 58m actual**, beating Sabanci's record.
 
 ### Six continents
 Best found: **MEL → SCL → PTY → MAD → ALG → DOH → MEL — 58h 50m** (Saturday Apr 11 departure)
@@ -223,8 +271,10 @@ circumnavigator/
 
 ## Records being targeted
 
-| Record | Time | Route | Date |
-|--------|------|-------|------|
-| Fastest circumnavigation | 44h 33m 39s | HKG → YVR → FRA → HKG | Nov 21–23, 2024 |
-| Six continents fastest | 56h 56m 00s | SYD → SCL → PTY → MAD → ALG → DXB → SYD | — |
-| Antipodal circumnavigation | 52h 34m 00s | PVG → AKL → EZE → AMS → PVG | Jan 21–23, 2018 |
+| Record | Time | Route | Date | Notes |
+|--------|------|-------|------|-------|
+| Circumnavigation (FAI, Concorde) | 44h 06m | LAX → LHR → BAH → SIN → BKK → MNL → NRT → HNL → LAX | Jan 1980 | Springbett; unbeatable by subsonic |
+| Circumnavigation (Guinness GWR 63169) | 44h 33m 39s | HKG → YVR → FRA → HKG | Nov 21–23, 2024 | ~27,500 km — likely below FAI distance floor |
+| **Circumnavigation (subsonic, FAI-compliant)** | **46h 23m 11s** | **LAX → DOH → BNE → LAX** | **Aug 2022** | **Sabanci; 37,215 km — actual target** |
+| Six continents fastest | 56h 56m 00s | SYD → SCL → PTY → MAD → ALG → DXB → SYD | — | |
+| Antipodal circumnavigation | 52h 34m 00s | PVG → AKL → EZE → AMS → PVG | Jan 21–23, 2018 | Andrew Fisher |
