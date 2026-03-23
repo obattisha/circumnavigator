@@ -89,16 +89,20 @@ Sabanci's own 46h 23m 11s relied on exactly this: QR LAX→DOH routinely departs
 A 57-minute late departure from LAX (within normal variance) + 15-minute early BNE→LAX arrival = **~45h 58m actual**, beating Sabanci's record.
 
 ### Six continents
-Best found: **MEL → SCL → PTY → MAD → ALG → DOH → MEL — 58h 50m** (Saturday Apr 11 departure)
+Best found: **SYD → SCL → PTY → MAD → ALG → DXB → SYD — 58h 10m** (Wednesday Apr 8 departure)
 
 | # | Route | Elapsed | vs Record |
 |---|-------|---------|-----------|
-| 1 | MEL → SCL → PTY → MAD → ALG → DOH → MEL | 58h 50m | +1h 54m |
-| 2 | MEL → SCL → PTY → MAD → CMN → DOH → MEL | 58h 50m | +1h 54m |
-| 3 | MEL → SCL → PTY → MAD → ALG → DXB → MEL | 58h 55m | +1h 59m |
-| 4 | SYD → SCL → PTY → MAD → ALG → DXB → SYD | 59h 20m | +2h 24m |
+| 1 | SYD → SCL → PTY → MAD → ALG → DXB → SYD | 58h 10m | +1h 14m |
+| 2 | MEL → SCL → PTY → MAD → ALG → DOH → MEL | 59h 20m | +2h 24m |
+| 3 | MEL → SCL → PTY → MAD → ALG → DXB → MEL | 59h 25m | +2h 29m |
+| 4 | DXB → SYD → SCL → PTY → MAD → ALG → DXB | 62h 55m | +5h 59m |
 
-Route 4 is the exact record-holder pattern reproduced with April 2026 flight schedules (JL5744 / CM498 / BA4222 / IB1377 / EK758 / EK414), confirming the record-setting route still operates — just with slightly different connection timing versus the November 2024 attempt.
+Route 1 is the exact record-holder pattern (MU4082/QF27 / CM498 / BA4222 / IB1377 / EK758 / EK414) reproduced with April 2026 schedules. The route is only feasible on **Wednesday/Saturday/Monday departures** from SYD — BA4222 (PTY→MAD) operates Mon/Wed/Sat only, and the SYD→SCL→PTY chain arrives PTY the same day it departs SYD.
+
+#### Why the record is 1h 14m faster than today's best schedule
+
+The 56h 56m record uses the same six flights. The gap is almost entirely explained by one change: **QF27 now departs SYD at 01:20 UTC (12:20 AEDT)** versus **02:29 UTC (13:29 AEDT) in January 2018** — 1h 09m earlier. Since EK414 still arrives SYD at 11:30 UTC, the last arrival is unchanged, and starting the clock 1h 09m earlier adds ~1h 09m to elapsed time. The remaining ~5 min comes from EK758 (ALG→DXB) now departing 35 min later (14:45 vs 14:10 UTC in 2018), though this does not affect the EK414 connection since there is still a 50-minute window at DXB.
 
 ### Antipodal circumnavigation
 

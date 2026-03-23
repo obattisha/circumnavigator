@@ -242,8 +242,18 @@ def search(
                     # Hit depth limit without closing — dead end.
                     continue
 
-            # Try every available flight on this leg (not just the first).
-            for fl, dep_dt, new_arr_dt in _all_next_flights(flights, earliest_dep, max_wait_hours):
+            # First leg: try every same-day departure (later start = shorter
+            # elapsed if downstream chain is unchanged). Intermediate legs:
+            # earliest only (arriving sooner is always at least as good).
+            if first_dep_ts is None:
+                same_day_end = earliest_dep + timedelta(hours=18)
+                all_opts = _all_next_flights(flights, earliest_dep, max_wait_hours)
+                candidates = [t for t in all_opts if t[1] <= same_day_end]
+                if not candidates:
+                    candidates = all_opts[:1]
+            else:
+                candidates = _all_next_flights(flights, earliest_dep, max_wait_hours)[:1]
+            for fl, dep_dt, new_arr_dt in candidates:
                 # Determine elapsed time.
                 if first_dep_ts is None:
                     new_first_dep_ts = dep_dt.timestamp()
