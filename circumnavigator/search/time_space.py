@@ -47,15 +47,16 @@ def _min_conn(airport: Airport) -> int:
     return MIN_CONNECTION_MINUTES.get(cc, MIN_CONNECTION_MINUTES["default"])
 
 
-def _next_flight(
+def _all_next_flights(
     flights: list[FlightFrequency],
     earliest: datetime,
     max_wait_hours: int,
-) -> Optional[tuple[FlightFrequency, datetime, datetime]]:
-    """Return the (flight, dep_dt, arr_dt) tuple for the first flight that
-    departs at or after *earliest* and within *max_wait_hours*."""
+) -> list[tuple[FlightFrequency, datetime, datetime]]:
+    """Return ALL (flight, dep_dt, arr_dt) tuples for flights departing at or
+    after *earliest* and within *max_wait_hours*."""
     cutoff = earliest + timedelta(hours=max_wait_hours)
     search_date = earliest.date()
+    result = []
 
     for day_offset in range(max_wait_hours // 24 + 2):
         d = search_date + timedelta(days=day_offset)
@@ -68,12 +69,13 @@ def _next_flight(
             if dep_dt < earliest:
                 continue
             if dep_dt > cutoff:
-                return None
+                continue
             arr_date = d + timedelta(days=1) if fl.overnight else d
             arr_dt = datetime(arr_date.year, arr_date.month, arr_date.day,
                               fl.arr_utc.hour, fl.arr_utc.minute, tzinfo=UTC)
-            return fl, dep_dt, arr_dt
-    return None
+            result.append((fl, dep_dt, arr_dt))
+
+    return result
 
 
 def _make_candidate(legs: list[ScheduledLeg], airports: dict[str, Airport],
@@ -240,76 +242,71 @@ def search(
                     # Hit depth limit without closing — dead end.
                     continue
 
-            # Find the next available flight on this leg.
-            found = _next_flight(flights, earliest_dep, max_wait_hours)
-            if found is None:
-                continue
+            # Try every available flight on this leg (not just the first).
+            for fl, dep_dt, new_arr_dt in _all_next_flights(flights, earliest_dep, max_wait_hours):
+                # Determine elapsed time.
+                if first_dep_ts is None:
+                    new_first_dep_ts = dep_dt.timestamp()
+                else:
+                    new_first_dep_ts = first_dep_ts
 
-            fl, dep_dt, new_arr_dt = found
-
-            # Determine elapsed time.
-            if first_dep_ts is None:
-                new_first_dep_ts = dep_dt.timestamp()
-            else:
-                new_first_dep_ts = first_dep_ts
-
-            new_elapsed = new_arr_dt.timestamp() - new_first_dep_ts
-            if new_elapsed > budget_s:
-                continue
-
-            # Build scheduled leg.
-            conn_min: Optional[int] = None
-            if legs:
-                prev_arr = datetime.fromtimestamp(arr_ts, tz=UTC)
-                conn_min = int((dep_dt - prev_arr).total_seconds() / 60)
-
-            new_leg = ScheduledLeg(
-                origin=cur_ap,
-                destination=dst,
-                flight_number=fl.flight_iata,
-                departure_utc=dep_dt,
-                arrival_utc=new_arr_dt,
-                duration_minutes=fl.duration_min,
-                connection_minutes=conn_min,
-            )
-            new_legs = legs + (new_leg,)
-
-            if closing:
-                # Valid circumnavigation found.
-                route_key = (origin, visited)
-                if route_key in seen:
+                new_elapsed = new_arr_dt.timestamp() - new_first_dep_ts
+                if new_elapsed > budget_s:
                     continue
-                seen.add(route_key)
 
-                legs_list = list(new_legs)
-                candidate = _make_candidate(legs_list, airports,
-                                            abs(new_lon), direction)
-                sr = ScheduledRoute(
-                    candidate=candidate,
-                    legs=legs_list,
-                    start_date=str(datetime.fromtimestamp(
-                        new_first_dep_ts, tz=UTC).date()),
+                # Build scheduled leg.
+                conn_min: Optional[int] = None
+                if legs:
+                    prev_arr = datetime.fromtimestamp(arr_ts, tz=UTC)
+                    conn_min = int((dep_dt - prev_arr).total_seconds() / 60)
+
+                new_leg = ScheduledLeg(
+                    origin=cur_ap,
+                    destination=dst,
+                    flight_number=fl.flight_iata,
+                    departure_utc=dep_dt,
+                    arrival_utc=new_arr_dt,
+                    duration_minutes=fl.duration_min,
+                    connection_minutes=conn_min,
                 )
-                results.append(sr)
+                new_legs = legs + (new_leg,)
 
-                if verbose and len(results) % 10 == 0:
-                    best = results[-1].elapsed_hms
-                    print(f"  Found {len(results)} schedules so far "
-                          f"(latest: {best}) ...", flush=True)
-            else:
-                new_visited = visited + (dst,)
-                heapq.heappush(pq, (
-                    new_elapsed, ctr,
-                    new_first_dep_ts,
-                    new_arr_dt.timestamp(),
-                    dst,
-                    new_visited,
-                    new_lon,
-                    new_km,
-                    new_legs,
-                    origin,
-                ))
-                ctr += 1
+                if closing:
+                    # Valid circumnavigation found.
+                    route_key = (origin, visited)
+                    if route_key in seen:
+                        continue
+                    seen.add(route_key)
+
+                    legs_list = list(new_legs)
+                    candidate = _make_candidate(legs_list, airports,
+                                                abs(new_lon), direction)
+                    sr = ScheduledRoute(
+                        candidate=candidate,
+                        legs=legs_list,
+                        start_date=str(datetime.fromtimestamp(
+                            new_first_dep_ts, tz=UTC).date()),
+                    )
+                    results.append(sr)
+
+                    if verbose and len(results) % 10 == 0:
+                        best = results[-1].elapsed_hms
+                        print(f"  Found {len(results)} schedules so far "
+                              f"(latest: {best}) ...", flush=True)
+                else:
+                    new_visited = visited + (dst,)
+                    heapq.heappush(pq, (
+                        new_elapsed, ctr,
+                        new_first_dep_ts,
+                        new_arr_dt.timestamp(),
+                        dst,
+                        new_visited,
+                        new_lon,
+                        new_km,
+                        new_legs,
+                        origin,
+                    ))
+                    ctr += 1
 
     results.sort(key=lambda r: r.total_elapsed_seconds)
     if verbose:
